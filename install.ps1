@@ -255,15 +255,15 @@
 		Write-Step 'Project-local .kxai and .koteli directories were preserved.'
 	}
 
-	$isWindows = $false
+	$runningOnWindows = $false
 	try {
-		$isWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+		$runningOnWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
 			[System.Runtime.InteropServices.OSPlatform]::Windows
 		)
 	} catch {
-		$isWindows = $env:OS -eq 'Windows_NT'
+		$runningOnWindows = $env:OS -eq 'Windows_NT'
 	}
-	if (-not $isWindows) {
+	if (-not $runningOnWindows) {
 		throw 'install.ps1 only supports Windows. Use install.sh on Linux or macOS.'
 	}
 
