@@ -6,7 +6,7 @@ kxki coding intelligence
 >this is currently in test build so not even pre-release. this still not include any security wall(for example prompt-injection, sandbox, security-token&context-safety-filter, command-filter etc.)
 >Install or use at your own risk.
 
-# installation
+# Installation
 
 ### install on koteli-tui (in terminal)
 
