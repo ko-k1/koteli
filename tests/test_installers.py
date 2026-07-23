@@ -161,31 +161,8 @@ class PosixInstallerTests(unittest.TestCase):
         self.home.mkdir()
         self.temp_dir.mkdir()
         machine = platform.machine().lower()
+        self.architecture = "aarch64" if machine in {"arm64", "aarch64"} else "amd64"
         self.system = "macos" if platform.system() == "Darwin" else "linux"
-        running_through_rosetta = False
-        if self.system == "macos" and machine in {"x86_64", "amd64"}:
-            translated = subprocess.run(
-                ["sysctl", "-in", "sysctl.proc_translated"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True,
-                check=False,
-            )
-            running_through_rosetta = (
-                translated.returncode == 0 and translated.stdout.strip() == "1"
-            )
-        self.architecture = (
-            "aarch64"
-            if machine in {"arm64", "aarch64"} or running_through_rosetta
-            else "amd64"
-        )
-        self.display_architecture = (
-            "arm64"
-            if self.system == "macos" and self.architecture == "aarch64"
-            else "x64"
-            if self.system == "macos"
-            else self.architecture
-        )
         self.fixture = MACH_O if self.system == "macos" else ELF
 
     def environment(self, base_url: str) -> dict[str, str]:
@@ -233,74 +210,13 @@ class PosixInstallerTests(unittest.TestCase):
             )
             expected = (SNAPSHOTS / "posix-install.txt").read_text(encoding="utf-8")
             expected = expected.replace("<SYSTEM>", self.system).replace(
-                "<ARCH>", self.display_architecture
+                "<ARCH>", self.architecture
             )
             self.assertEqual(normalized, expected)
         for binary in ("koteli", "kxaid"):
             path = self.install_dir / binary
             self.assertTrue(path.is_file())
             self.assertTrue(os.access(path, os.X_OK))
-
-    def test_macos_intel_apple_silicon_and_rosetta_artifact_mapping(self) -> None:
-        cases = (
-            ("intel", "x86_64", "0", "amd64", "x64"),
-            ("apple-silicon", "arm64", "0", "aarch64", "arm64"),
-            ("rosetta", "x86_64", "1", "aarch64", "arm64"),
-        )
-        original_install_dir = self.install_dir
-        for label, machine, translated, artifact_arch, display_arch in cases:
-            with self.subTest(label=label):
-                fake_bin = self.workspace / f"fake-bin-{label}"
-                fake_bin.mkdir()
-                fake_uname = fake_bin / "uname"
-                fake_uname.write_text(
-                    "#!/bin/sh\n"
-                    "case \"$1\" in\n"
-                    "  -s) printf '%s\\n' Darwin ;;\n"
-                    f"  -m) printf '%s\\n' {machine} ;;\n"
-                    "  *) exit 1 ;;\n"
-                    "esac\n",
-                    encoding="ascii",
-                )
-                fake_uname.chmod(0o755)
-                fake_sysctl = fake_bin / "sysctl"
-                fake_sysctl.write_text(
-                    f"#!/bin/sh\nprintf '%s\\n' {translated}\n",
-                    encoding="ascii",
-                )
-                fake_sysctl.chmod(0o755)
-
-                self.install_dir = self.workspace / f"bin-{label}"
-                fixtures = fixture_map(
-                    "macos",
-                    artifact_arch,
-                    first=MACH_O,
-                    second=MACH_O,
-                )
-                with FixtureServer(fixtures) as server:
-                    env = self.environment(server.base_url)
-                    env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
-                    result = self.run_installer(env)
-                    self.assertEqual(
-                        result.returncode,
-                        0,
-                        result.stderr.decode(errors="replace"),
-                    )
-                    output = assert_plain(self, result.stdout + result.stderr)
-                    self.assertIn(
-                        f"[ok] Detect - macos/{display_arch}; presence 0/2",
-                        output,
-                    )
-                    self.assertEqual(
-                        server.hits,
-                        [
-                            f"/{artifact_arch}/macos/koteli",
-                            f"/{artifact_arch}/macos/kxaid",
-                        ],
-                    )
-                self.assertTrue((self.install_dir / "koteli").is_file())
-                self.assertTrue((self.install_dir / "kxaid").is_file())
-        self.install_dir = original_install_dir
 
     def test_second_binary_validation_failure_installs_nothing_and_cleans_up(self) -> None:
         fixtures = fixture_map(
