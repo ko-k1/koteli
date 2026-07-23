@@ -8,9 +8,13 @@ kxki coding intelligence
 
 # Installation
 
-The native installer downloads both Koteli and its `kxaid` daemon. The
-current published native build is Windows x64; other platforms fail cleanly
-until their binaries are added to this repository.
+The native installer downloads both Koteli and its `kxaid` daemon. macOS and
+Linux share `install.sh`, while each platform keeps its own executable format:
+Linux uses ELF and macOS uses Mach-O. On macOS, Intel models select the `x64`
+build from `amd64/macos`, and Apple Silicon selects the `arm64` build from
+`aarch64/macos` (including when the installer is launched through Rosetta).
+An unavailable platform build fails cleanly instead of using a binary from a
+different operating system.
 
 ### Install Koteli in a terminal
 

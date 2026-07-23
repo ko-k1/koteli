@@ -643,9 +643,30 @@ case "$detected_system" in
 esac
 
 detected_machine=$(uname -m)
+if [ "$platform" = "macos" ] &&
+	[ "$detected_machine" = "x86_64" ] &&
+	command -v sysctl >/dev/null 2>&1 &&
+	[ "$(sysctl -in sysctl.proc_translated 2>/dev/null || :)" = "1" ]; then
+	# Prefer the native Apple Silicon build when the installer runs under Rosetta.
+	detected_machine="arm64"
+fi
 case "$detected_machine" in
-	x86_64 | amd64) architecture="amd64" ;;
-	aarch64 | arm64) architecture="aarch64" ;;
+	x86_64 | amd64)
+		artifact_architecture="amd64"
+		if [ "$platform" = "macos" ]; then
+			architecture="x64"
+		else
+			architecture="amd64"
+		fi
+		;;
+	aarch64 | arm64)
+		artifact_architecture="aarch64"
+		if [ "$platform" = "macos" ]; then
+			architecture="arm64"
+		else
+			architecture="aarch64"
+		fi
+		;;
 	*) fail "unsupported CPU architecture: $detected_machine" ;;
 esac
 
@@ -725,7 +746,7 @@ if ! temp_dir=$(mktemp -d "${temp_root%/}/koteli-install.XXXXXX" 2>/dev/null); t
 fi
 
 for binary in $binaries; do
-	url="${download_base}/${architecture}/${platform}/${binary}"
+	url="${download_base}/${artifact_architecture}/${platform}/${binary}"
 	destination="${temp_dir}/${binary}"
 	download_error_log="${temp_dir}/${binary}.download.log"
 	stage_start "Fetch" "$binary for ${platform}/${architecture}"
