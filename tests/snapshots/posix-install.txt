@@ -1,0 +1,24 @@
+== Koteli ==
+[start] Detect - platform, target, and binaries
+[ok] Detect - <SYSTEM>/<ARCH>; presence 0/2
+[start] Fetch - koteli for <SYSTEM>/<ARCH>
+[ok] Fetch - koteli
+[start] Validate format - koteli
+[ok] Validate format - koteli is a <SYSTEM> executable
+[start] Fetch - kxaid for <SYSTEM>/<ARCH>
+[ok] Fetch - kxaid
+[start] Validate format - kxaid
+[ok] Validate format - kxaid is a <SYSTEM> executable
+[start] Install/Remove - install koteli and kxaid
+[ok] Install/Remove - koteli and kxaid installed
+[start] PATH - inspect current shell
+[ok] PATH - unchanged; install directory is not in PATH
+
+[result] Action: installed
+[result] Binaries: koteli, kxaid
+[result] Destination: <INSTALL_DIR>
+[result] PATH: unchanged; install directory is not in PATH
+[result] Koteli state: preserved (<CONFIG_DIR>)
+[next] Add to PATH: export PATH="<INSTALL_DIR>:$PATH"
+[next] Terminal 1: kxaid - start the daemon
+[next] Terminal 2: koteli - open Koteli

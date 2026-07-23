@@ -1,0 +1,63 @@
+name: Native installers
+
+on:
+  push:
+    paths:
+      - install.sh
+      - install.ps1
+      - tests/**
+      - .github/workflows/installers.yml
+  pull_request:
+    paths:
+      - install.sh
+      - install.ps1
+      - tests/**
+      - .github/workflows/installers.yml
+
+permissions:
+  contents: read
+
+jobs:
+  posix:
+    name: ${{ matrix.os }} /bin/sh
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check POSIX syntax
+        run: /bin/sh -n install.sh
+      - name: Run installer tests
+        run: python3 -m unittest -v tests/test_installers.py
+
+  windows:
+    name: Windows PowerShell 5.1 and PowerShell 7
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Windows PowerShell 5.1 syntax
+        shell: powershell
+        run: |
+          $errors = $null
+          [Management.Automation.Language.Parser]::ParseFile(
+            "$pwd\install.ps1", [ref]$null, [ref]$errors
+          ) > $null
+          if ($errors.Count) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+      - name: Check PowerShell 7 syntax
+        shell: pwsh
+        run: |
+          $errors = $null
+          [Management.Automation.Language.Parser]::ParseFile(
+            "$pwd\install.ps1", [ref]$null, [ref]$errors
+          ) > $null
+          if ($errors.Count) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+      - name: Run installer tests
+        run: python -m unittest -v tests/test_installers.py

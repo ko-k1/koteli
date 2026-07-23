@@ -36,14 +36,48 @@ until their binaries are added to this repository.
 
 After installation, start `kxaid` in one terminal and `koteli` in another.
 
-Running a native installer again detects the existing installation and offers
-Update, Repair, Uninstall, or Cancel. Uninstall asks before removing Koteli's
-user configuration and state; project-local `.kxai` and `.koteli` directories
-are always preserved.
+Running a native installer again opens a compact installed-app manager:
 
-Set `KOTELI_INSTALL_DIR` to choose a custom destination. Maintainers can also
-set `KOTELI_REF` or `KOTELI_DOWNLOAD_BASE` to install from a tag, branch, or
-artifact mirror. On Windows, set `KOTELI_NO_PATH_UPDATE=1` to leave the user
-`PATH` unchanged. For non-interactive use, set `KOTELI_ACTION` to `update`,
-`repair`, `uninstall`, or `cancel`; combine `KOTELI_ACTION=uninstall` with
-`KOTELI_REMOVE_CONFIG=yes` to remove user configuration without a prompt.
+```text
+  [ Update    ] refresh both binaries
+  [ Repair    ] reinstall both binaries
+  [ Uninstall ] remove binaries; configuration is handled separately
+  [ Cancel    ] make no changes
+```
+
+In a capable terminal, use Up/Down, Enter, Escape, or the number keys. Narrow
+terminals and terminals without safe cursor or key support receive a numbered
+menu instead. The installer leaves its transcript visible; it never switches
+to an alternate screen or clears completed output.
+
+Redirected output and runs with a nonempty `CI`, `TERM=dumb`, or `NO_COLOR`
+(including an empty `NO_COLOR`) use stable ASCII-only output without animation
+or terminal control sequences. Otherwise, color is enabled on a real terminal,
+with Unicode decoration only when its output encoding is UTF-8.
+
+Uninstall displays Koteli's exact user-state compatibility path and asks
+`Remove Koteli user configuration and state? [y/N]`. The default is No.
+Project-local `.kxai` and `.koteli` directories are never removed.
+
+### Native installer automation
+
+- `KOTELI_INSTALL_DIR` selects the binary destination.
+- `KOTELI_REPOSITORY` and `KOTELI_REF` select a GitHub repository and ref.
+- `KOTELI_DOWNLOAD_BASE` replaces the complete artifact base URL.
+- `KOTELI_ACTION` bypasses the manager with `update`, `repair`, `uninstall`, or
+  `cancel`. The existing `install` value remains a repair alias when binaries
+  are already present.
+- `KOTELI_REMOVE_CONFIG` accepts `yes`/`no`, `true`/`false`, `y`/`n`, or
+  `1`/`0`. It is validated before uninstall removes anything.
+- On Windows, `KOTELI_NO_PATH_UPDATE=1` leaves both the user and current-process
+  `PATH` unchanged.
+
+For example, a non-interactive binary-only uninstall is:
+
+```bash
+KOTELI_ACTION=uninstall KOTELI_REMOVE_CONFIG=no sh install.sh
+```
+
+To remove the compatible Koteli user state too, use
+`KOTELI_REMOVE_CONFIG=yes`. The `ai.kxki.dev` commands shown above remain the
+canonical hosted installer commands.
