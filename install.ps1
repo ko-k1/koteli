@@ -406,12 +406,12 @@
 			'remove binaries; state separate',
 			'make no changes'
 		)[$Index]
-		if ($Index -eq $Selected) {
-			return (
-				"$($script:KoteliBold)$($script:KoteliCyan)> [ {0,-9} ]" +
-				"$($script:KoteliReset) {1}" -f $title, $description
-			)
-		}
+	if ($Index -eq $Selected) {
+		return (
+			("$($script:KoteliBold)$($script:KoteliCyan)> [ {0,-9} ]" +
+			"$($script:KoteliReset) {1}") -f $title, $description
+		)
+	}
 		return ('  [ {0,-9} ] {1}' -f $title, $description)
 	}
 
