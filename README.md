@@ -1,5 +1,5 @@
-# koteli
-kxki coding intelligence
+# Koteli / kəʊˈtéli
+**K**xki **Co**ding In**telli**gence
 
 # READ BEFORE USE THIS TOOL
 >[!WARNING]
