@@ -5,7 +5,10 @@ set -eu
 program_name="Koteli"
 repository="${KOTELI_REPOSITORY:-ko-k1/koteli}"
 ref="${KOTELI_REF:-main}"
-binaries="koteli kxaid"
+binaries="koteli kotelid"
+# The daemon was called kxaid before it became kotelid; installs from then
+# still carry it, so update, repair, and uninstall remove it.
+legacy_binaries="kxaid"
 
 temp_dir=""
 saved_tty_state=""
@@ -513,7 +516,10 @@ resolve_config_removal() {
 		return
 	fi
 
-	ui_warning "Koteli state" "$config_dir (legacy kxai compatibility path)"
+	ui_warning "Koteli state" "$config_dir"
+	if [ -n "$legacy_config_dir" ] && { [ -e "$legacy_config_dir" ] || [ -L "$legacy_config_dir" ]; }; then
+		ui_warning "Legacy kxai state" "$legacy_config_dir"
+	fi
 	ui_detail "Local projects" ".kxai and .koteli remain untouched"
 	if save_tty_state; then
 		printf 'Remove Koteli user configuration and state? [y/N] ' > /dev/tty
@@ -530,15 +536,30 @@ uninstall_koteli() {
 	resolve_config_removal
 
 	config_exists=0
-	if [ -e "$config_dir" ] || [ -L "$config_dir" ]; then
+	if [ -n "$config_dir" ] && { [ -e "$config_dir" ] || [ -L "$config_dir" ]; }; then
 		config_exists=1
 	fi
+	legacy_config_exists=0
+	if [ -n "$legacy_config_dir" ] && { [ -e "$legacy_config_dir" ] || [ -L "$legacy_config_dir" ]; }; then
+		legacy_config_exists=1
+	fi
+	# Only the exact state directories are ever removed, so a surprising
+	# environment can never aim rm -rf somewhere else.
 	if [ "$remove_config" = "yes" ] && [ "$config_exists" -eq 1 ]; then
 		case "$config_dir" in
-			*/kxai/tui/.kxai | */kxai-tui/.kxai)
+			"${HOME%/}/.koteli")
 				;;
 			*)
 				fail "refusing to remove unexpected configuration path: $config_dir"
+				;;
+		esac
+	fi
+	if [ "$remove_config" = "yes" ] && [ "$legacy_config_exists" -eq 1 ]; then
+		case "$legacy_config_dir" in
+			*/kxai/tui/.kxai | */kxai-tui/.kxai)
+				;;
+			*)
+				fail "refusing to remove unexpected configuration path: $legacy_config_dir"
 				;;
 		esac
 	fi
@@ -547,9 +568,10 @@ uninstall_koteli() {
 	ui_status ok "Validate format" "not required for uninstall"
 
 	koteli_remove_status="not found"
+	kotelid_remove_status="not found"
 	kxaid_remove_status="not found"
 	stage_start "Install/Remove" "remove binaries and state"
-	for managed_name in $binaries; do
+	for managed_name in $binaries $legacy_binaries; do
 		managed_path="${install_dir}/${managed_name}"
 		if [ -f "$managed_path" ] || [ -L "$managed_path" ]; then
 			if ! rm -f "$managed_path" 2>/dev/null; then
@@ -557,6 +579,7 @@ uninstall_koteli() {
 			fi
 			case "$managed_name" in
 				koteli) koteli_remove_status="removed" ;;
+				kotelid) kotelid_remove_status="removed" ;;
 				kxaid) kxaid_remove_status="removed" ;;
 			esac
 		fi
@@ -576,6 +599,17 @@ uninstall_koteli() {
 	else
 		config_remove_status="not found"
 	fi
+	legacy_config_remove_status=""
+	if [ "$legacy_config_exists" -eq 1 ]; then
+		if [ "$remove_config" = "yes" ]; then
+			if ! rm -rf "$legacy_config_dir" 2>/dev/null; then
+				fail "Legacy kxai state: could not remove $legacy_config_dir"
+			fi
+			legacy_config_remove_status="removed"
+		else
+			legacy_config_remove_status="preserved"
+		fi
+	fi
 	stage_ok "managed files handled"
 
 	stage_start "PATH" "inspect current shell"
@@ -585,10 +619,16 @@ uninstall_koteli() {
 	printf '\n'
 	ui_receipt "Action" "uninstalled"
 	ui_receipt "koteli" "$koteli_remove_status"
-	ui_receipt "kxaid" "$kxaid_remove_status"
+	ui_receipt "kotelid" "$kotelid_remove_status"
+	if [ "$kxaid_remove_status" = "removed" ]; then
+		ui_receipt "Legacy kxaid" "removed"
+	fi
 	ui_receipt "Destination" "$install_dir"
 	ui_receipt "PATH" "$path_remove_status"
 	ui_receipt "Koteli state" "$config_remove_status ($config_dir)"
+	if [ -n "$legacy_config_remove_status" ]; then
+		ui_receipt "Legacy kxai state" "$legacy_config_remove_status ($legacy_config_dir)"
+	fi
 	ui_receipt "Local projects" ".kxai and .koteli preserved"
 }
 
@@ -680,12 +720,20 @@ else
 	fail "HOME is not set; set KOTELI_INSTALL_DIR to a writable bin directory"
 fi
 
-if [ -n "${XDG_STATE_HOME:-}" ]; then
-	config_dir="${XDG_STATE_HOME%/}/kxai/tui/.kxai"
-elif [ -n "${HOME:-}" ]; then
-	config_dir="${HOME%/}/.local/state/kxai/tui/.kxai"
+# Koteli keeps its user configuration and state, including the daemon's
+# endpoint record, client tokens, and log, in ~/.koteli.
+if [ -n "${HOME:-}" ]; then
+	config_dir="${HOME%/}/.koteli"
 else
-	config_dir="${TMPDIR:-/tmp}/kxai-tui/.kxai"
+	config_dir=""
+fi
+# Where kxai-era builds kept their state; current builds never read it.
+if [ -n "${XDG_STATE_HOME:-}" ]; then
+	legacy_config_dir="${XDG_STATE_HOME%/}/kxai/tui/.kxai"
+elif [ -n "${HOME:-}" ]; then
+	legacy_config_dir="${HOME%/}/.local/state/kxai/tui/.kxai"
+else
+	legacy_config_dir="${TMPDIR:-/tmp}/kxai-tui/.kxai"
 fi
 
 if [ -n "${KOTELI_DOWNLOAD_BASE:-}" ]; then
@@ -701,9 +749,16 @@ for managed_name in $binaries; do
 		installed_files=$((installed_files + 1))
 	fi
 done
+legacy_files=0
+for managed_name in $legacy_binaries; do
+	managed_path="${install_dir}/${managed_name}"
+	if [ -f "$managed_path" ] || [ -L "$managed_path" ]; then
+		legacy_files=$((legacy_files + 1))
+	fi
+done
 stage_ok "${platform}/${architecture}; presence ${installed_files}/2"
 
-if [ "$installed_files" -eq 0 ]; then
+if [ "$installed_files" -eq 0 ] && [ "$legacy_files" -eq 0 ]; then
 	action="install"
 else
 	if [ "$ui_unicode" -eq 1 ]; then
@@ -714,6 +769,9 @@ else
 		printf 'manage - %s/%s -> %s\n' "$platform" "$architecture" "$install_dir"
 	fi
 	ui_detail "Binaries" "${installed_files}/2 present"
+	if [ "$legacy_files" -gt 0 ]; then
+		ui_detail "Legacy" "kxaid present; replaced by kotelid"
+	fi
 	choose_existing_action
 fi
 
@@ -760,7 +818,7 @@ for binary in $binaries; do
 	stage_ok "$binary is a ${platform} executable"
 done
 
-stage_start "Install/Remove" "${action} koteli and kxaid"
+stage_start "Install/Remove" "${action} koteli and kotelid"
 if ! mkdir -p "$install_dir" 2>/dev/null; then
 	fail "could not create $install_dir"
 fi
@@ -778,7 +836,17 @@ for binary in $binaries; do
 		fi
 	fi
 done
-stage_ok "koteli and kxaid installed"
+legacy_removed=""
+for legacy_name in $legacy_binaries; do
+	legacy_path="${install_dir}/${legacy_name}"
+	if [ -f "$legacy_path" ] || [ -L "$legacy_path" ]; then
+		if ! rm -f "$legacy_path" 2>/dev/null; then
+			fail "$legacy_name: could not remove the replaced daemon $legacy_path"
+		fi
+		legacy_removed="$legacy_name"
+	fi
+done
+stage_ok "koteli and kotelid installed"
 
 stage_start "PATH" "inspect current shell"
 case ":${PATH:-}:" in
@@ -800,12 +868,15 @@ esac
 
 printf '\n'
 ui_receipt "Action" "$result"
-ui_receipt "Binaries" "koteli, kxaid"
+ui_receipt "Binaries" "koteli, kotelid"
+if [ -n "$legacy_removed" ]; then
+	ui_receipt "Legacy kxaid" "removed"
+fi
 ui_receipt "Destination" "$install_dir"
 ui_receipt "PATH" "$path_state"
 ui_receipt "Koteli state" "preserved ($config_dir)"
 if [ "$path_state" != "already available" ]; then
 	ui_next "Add to PATH" "export PATH=\"${install_dir}:\$PATH\""
 fi
-ui_next "Terminal 1" "kxaid - start the daemon"
+ui_next "Terminal 1" "kotelid - start the daemon (or kotelid --daemonize)"
 ui_next "Terminal 2" "koteli - open Koteli"

@@ -8,7 +8,7 @@
 
 # Installation
 
-The native installer downloads both Koteli and its `kxaid` daemon. macOS and
+The native installer downloads both Koteli and its `kotelid` daemon. macOS and
 Linux share `install.sh`, while each platform keeps its own executable format:
 Linux uses ELF and macOS uses Mach-O. On macOS, Intel models select the `x64`
 build from `amd64/macos`, and Apple Silicon selects the `arm64` build from
@@ -38,7 +38,16 @@ different operating system.
     npm install -g @kxki-dev/koteli
     ```
 
-After installation, start `kxaid` in one terminal and `koteli` in another.
+After installation, start `kotelid` in one terminal and `koteli` in another, or
+run `kotelid --daemonize` to start the daemon in the background.
+
+Koteli keeps its user configuration and state in `~/.koteli`
+(`%USERPROFILE%\.koteli` on Windows), including the running daemon's endpoint
+record, its per-start client token, and its log.
+
+Upgrading from a build whose daemon was called `kxaid`: Update and Repair
+install `kotelid` and remove the old `kxaid` binary. An installation that still
+holds only `kxaid` is recognized and repaired.
 
 Running a native installer again opens a compact installed-app manager:
 
@@ -59,8 +68,10 @@ Redirected output and runs with a nonempty `CI`, `TERM=dumb`, or `NO_COLOR`
 or terminal control sequences. Otherwise, color is enabled on a real terminal,
 with Unicode decoration only when its output encoding is UTF-8.
 
-Uninstall displays Koteli's exact user-state compatibility path and asks
-`Remove Koteli user configuration and state? [y/N]`. The default is No.
+Uninstall displays Koteli's exact user-state path, `~/.koteli`, and, when it
+still exists, the legacy `kxai` state directory used by earlier builds, then
+asks `Remove Koteli user configuration and state? [y/N]`. The default is No;
+Yes removes both. Uninstall also removes a leftover `kxaid` binary.
 Project-local `.kxai` and `.koteli` directories are never removed.
 
 ### Native installer automation
@@ -82,6 +93,6 @@ For example, a non-interactive binary-only uninstall is:
 KOTELI_ACTION=uninstall KOTELI_REMOVE_CONFIG=no sh install.sh
 ```
 
-To remove the compatible Koteli user state too, use
+To remove the Koteli user state too, use
 `KOTELI_REMOVE_CONFIG=yes`. The `ai.kxki.dev` commands shown above remain the
 canonical hosted installer commands.

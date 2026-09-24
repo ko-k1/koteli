@@ -5,19 +5,19 @@
 [ok] Fetch - koteli.exe
 [start] Validate format - koteli.exe
 [ok] Validate format - koteli.exe is a Windows executable
-[start] Fetch - kxaid.exe for windows/<ARCH>
-[ok] Fetch - kxaid.exe
-[start] Validate format - kxaid.exe
-[ok] Validate format - kxaid.exe is a Windows executable
+[start] Fetch - kotelid.exe for windows/<ARCH>
+[ok] Fetch - kotelid.exe
+[start] Validate format - kotelid.exe
+[ok] Validate format - kotelid.exe is a Windows executable
 [start] Install/Remove - install both binaries
-[ok] Install/Remove - koteli.exe and kxaid.exe installed
+[ok] Install/Remove - koteli.exe and kotelid.exe installed
 [start] PATH - inspect and update user PATH
 [ok] PATH - unchanged (KOTELI_NO_PATH_UPDATE=1)
 
 [result] Action: installed
-[result] Binaries: koteli.exe, kxaid.exe
+[result] Binaries: koteli.exe, kotelid.exe
 [result] Destination: <INSTALL_DIR>
 [result] PATH: unchanged (KOTELI_NO_PATH_UPDATE=1)
 [result] Koteli state: preserved (<CONFIG_DIR>)
-[next] Terminal 1: kxaid - start the daemon
+[next] Terminal 1: kotelid - start the daemon (or kotelid --daemonize)
 [next] Terminal 2: koteli - open Koteli

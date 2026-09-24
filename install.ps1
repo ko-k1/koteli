@@ -249,7 +249,24 @@
 		}
 	}
 
+	function Get-KoteliHomeDirectory {
+		# Matches the binaries: HOME first, then the Windows user profile.
+		foreach ($candidate in @($env:HOME, $env:USERPROFILE)) {
+			if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+				return $candidate
+			}
+		}
+		return [Environment]::GetFolderPath('UserProfile')
+	}
+
 	function Get-KoteliConfigDirectory {
+		# Koteli keeps its user configuration and state, including the daemon's
+		# endpoint record, client tokens, and log, in ~/.koteli.
+		return Join-Path (Get-KoteliHomeDirectory) '.koteli'
+	}
+
+	function Get-KoteliLegacyConfigDirectory {
+		# Where kxai-era builds kept their state; current builds never read it.
 		$baseDirectory = if ($env:LOCALAPPDATA) {
 			$env:LOCALAPPDATA
 		} elseif ($env:APPDATA) {
@@ -628,7 +645,10 @@
 	}
 
 	function Confirm-KoteliConfigRemoval {
-		param([Parameter(Mandatory)][string] $ConfigDirectory)
+		param(
+			[Parameter(Mandatory)][string] $ConfigDirectory,
+			[Parameter(Mandatory)][string] $LegacyConfigDirectory
+		)
 
 		if ($env:KOTELI_REMOVE_CONFIG) {
 			switch ($env:KOTELI_REMOVE_CONFIG.ToLowerInvariant()) {
@@ -647,9 +667,10 @@
 			return $false
 		}
 
-		Write-KoteliStatus -Kind warn -Label 'Koteli state' -Detail (
-			"$ConfigDirectory (legacy kxai compatibility path)"
-		)
+		Write-KoteliStatus -Kind warn -Label 'Koteli state' -Detail $ConfigDirectory
+		if (Test-Path -LiteralPath $LegacyConfigDirectory) {
+			Write-KoteliStatus -Kind warn -Label 'Legacy kxai state' -Detail $LegacyConfigDirectory
+		}
 		Write-KoteliDetail -Label 'Local projects' -Value (
 			'.kxai and .koteli remain untouched'
 		)
@@ -665,6 +686,23 @@
 	}
 
 	function Assert-SafeKoteliConfigPath {
+		param([Parameter(Mandatory)][string] $ConfigDirectory)
+		# Only the exact ~/.koteli is ever removed, so a surprising environment
+		# can never aim a recursive delete somewhere else.
+		$fullConfigPath = [IO.Path]::GetFullPath($ConfigDirectory)
+		$expected = [IO.Path]::GetFullPath(
+			(Join-Path (Get-KoteliHomeDirectory) '.koteli')
+		)
+		if (-not [string]::Equals(
+			$fullConfigPath.TrimEnd('\'), $expected.TrimEnd('\'),
+			[StringComparison]::OrdinalIgnoreCase
+		)) {
+			throw "Refusing to remove unexpected configuration path: $fullConfigPath"
+		}
+		return $fullConfigPath
+	}
+
+	function Assert-SafeKoteliLegacyConfigPath {
 		param([Parameter(Mandatory)][string] $ConfigDirectory)
 		$fullConfigPath = [IO.Path]::GetFullPath($ConfigDirectory)
 		$configLeaf = Split-Path $fullConfigPath -Leaf
@@ -689,11 +727,14 @@
 		param(
 			[Parameter(Mandatory)][string] $InstallDirectory,
 			[Parameter(Mandatory)][string[]] $Binaries,
-			[Parameter(Mandatory)][string] $ConfigDirectory
+			[Parameter(Mandatory)][string[]] $LegacyBinaries,
+			[Parameter(Mandatory)][string] $ConfigDirectory,
+			[Parameter(Mandatory)][string] $LegacyConfigDirectory
 		)
 
 		# Validate the automation value and the deletion boundary before removing anything.
-		$removeConfig = Confirm-KoteliConfigRemoval -ConfigDirectory $ConfigDirectory
+		$removeConfig = Confirm-KoteliConfigRemoval -ConfigDirectory $ConfigDirectory `
+			-LegacyConfigDirectory $LegacyConfigDirectory
 		$configExists = $false
 		try {
 			$null = Get-Item -LiteralPath $ConfigDirectory -Force
@@ -703,6 +744,16 @@
 		}
 		if ($removeConfig -and $configExists) {
 			$null = Assert-SafeKoteliConfigPath -ConfigDirectory $ConfigDirectory
+		}
+		$legacyConfigExists = $false
+		try {
+			$null = Get-Item -LiteralPath $LegacyConfigDirectory -Force
+			$legacyConfigExists = $true
+		} catch {
+			$legacyConfigExists = $false
+		}
+		if ($removeConfig -and $legacyConfigExists) {
+			$null = Assert-SafeKoteliLegacyConfigPath -ConfigDirectory $LegacyConfigDirectory
 		}
 
 		Write-KoteliStatus -Kind ok -Label 'Fetch' -Detail 'not required for uninstall'
@@ -714,7 +765,7 @@
 		Start-KoteliStage -Stage 'Install/Remove' -Detail (
 			'remove binaries and state'
 		)
-		foreach ($binary in $Binaries) {
+		foreach ($binary in @($Binaries) + @($LegacyBinaries)) {
 			$managedPath = Join-Path $InstallDirectory $binary
 			if (Test-KoteliManagedPath -Path $managedPath) {
 				Remove-Item -LiteralPath $managedPath -Force
@@ -735,6 +786,15 @@
 			$configResult = 'preserved'
 		} else {
 			$configResult = 'not found'
+		}
+		$legacyConfigResult = $null
+		if ($legacyConfigExists) {
+			if ($removeConfig) {
+				Remove-KoteliConfigPath -ConfigDirectory $LegacyConfigDirectory
+				$legacyConfigResult = 'removed'
+			} else {
+				$legacyConfigResult = 'preserved'
+			}
 		}
 		Complete-KoteliStage -Detail 'managed files handled'
 
@@ -760,10 +820,18 @@
 		[Console]::Out.WriteLine()
 		Write-KoteliReceipt -Label 'Action' -Value 'uninstalled'
 		Write-KoteliReceipt -Label 'koteli.exe' -Value $binaryResults['koteli.exe']
-		Write-KoteliReceipt -Label 'kxaid.exe' -Value $binaryResults['kxaid.exe']
+		Write-KoteliReceipt -Label 'kotelid.exe' -Value $binaryResults['kotelid.exe']
+		if ($binaryResults['kxaid.exe'] -eq 'removed') {
+			Write-KoteliReceipt -Label 'Legacy kxaid.exe' -Value 'removed'
+		}
 		Write-KoteliReceipt -Label 'Destination' -Value $InstallDirectory
 		Write-KoteliReceipt -Label 'PATH' -Value $pathResult
 		Write-KoteliReceipt -Label 'Koteli state' -Value "$configResult ($ConfigDirectory)"
+		if ($legacyConfigResult) {
+			Write-KoteliReceipt -Label 'Legacy kxai state' -Value (
+				"$legacyConfigResult ($LegacyConfigDirectory)"
+			)
+		}
 		Write-KoteliReceipt -Label 'Local projects' -Value '.kxai and .koteli preserved'
 	}
 
@@ -798,7 +866,11 @@
 		}
 		$installDirectory = [IO.Path]::GetFullPath($installDirectory)
 		$configDirectory = Get-KoteliConfigDirectory
-		$binaries = @('koteli.exe', 'kxaid.exe')
+		$legacyConfigDirectory = Get-KoteliLegacyConfigDirectory
+		$binaries = @('koteli.exe', 'kotelid.exe')
+		# The daemon was called kxaid before it became kotelid; installs from then
+		# still carry it, so update, repair, and uninstall remove it.
+		$legacyBinaries = @('kxaid.exe')
 
 		$repository = if ($env:KOTELI_REPOSITORY) {
 			$env:KOTELI_REPOSITORY.Trim('/')
@@ -825,11 +897,16 @@
 				Test-KoteliManagedPath -Path (Join-Path $installDirectory $_)
 			}
 		).Count
+		$legacyCount = @(
+			$legacyBinaries | Where-Object {
+				Test-KoteliManagedPath -Path (Join-Path $installDirectory $_)
+			}
+		).Count
 		Complete-KoteliStage -Detail (
 			"windows/$architecture; presence $installedCount/2"
 		)
 
-		if ($installedCount -eq 0) {
+		if ($installedCount -eq 0 -and $legacyCount -eq 0) {
 			$action = 'install'
 		} else {
 			if ($script:KoteliUnicode) {
@@ -844,13 +921,22 @@
 				)
 			}
 			Write-KoteliDetail -Label 'Binaries' -Value "$installedCount/2 present"
-			$action = Resolve-KoteliAction -InstalledCount $installedCount
+			if ($legacyCount -gt 0) {
+				Write-KoteliDetail -Label 'Legacy' -Value 'kxaid.exe present; replaced by kotelid.exe'
+			}
+			# WHY at least 1: an install holding only the legacy kxaid.exe is
+			# still an install, and like any partial one it defaults to Repair.
+			$action = Resolve-KoteliAction -InstalledCount (
+				[Math]::Max($installedCount, 1)
+			)
 		}
 
 		switch ($action) {
 			'uninstall' {
 				Invoke-KoteliUninstall -InstallDirectory $installDirectory `
-					-Binaries $binaries -ConfigDirectory $configDirectory
+					-Binaries $binaries -LegacyBinaries $legacyBinaries `
+					-ConfigDirectory $configDirectory `
+					-LegacyConfigDirectory $legacyConfigDirectory
 				return
 			}
 			'cancel' {
@@ -895,7 +981,15 @@
 				Copy-Item -LiteralPath (Join-Path $tempDirectory $binary) `
 					-Destination (Join-Path $installDirectory $binary) -Force
 			}
-			Complete-KoteliStage -Detail 'koteli.exe and kxaid.exe installed'
+			$legacyRemoved = $false
+			foreach ($legacyBinary in $legacyBinaries) {
+				$legacyPath = Join-Path $installDirectory $legacyBinary
+				if (Test-KoteliManagedPath -Path $legacyPath) {
+					Remove-Item -LiteralPath $legacyPath -Force
+					$legacyRemoved = $true
+				}
+			}
+			Complete-KoteliStage -Detail 'koteli.exe and kotelid.exe installed'
 
 			$pathMarker = Join-Path $installDirectory '.koteli-path-added'
 			Start-KoteliStage -Stage 'PATH' -Detail 'inspect and update user PATH'
@@ -929,13 +1023,18 @@
 			}
 			[Console]::Out.WriteLine()
 			Write-KoteliReceipt -Label 'Action' -Value $result
-			Write-KoteliReceipt -Label 'Binaries' -Value 'koteli.exe, kxaid.exe'
+			Write-KoteliReceipt -Label 'Binaries' -Value 'koteli.exe, kotelid.exe'
+			if ($legacyRemoved) {
+				Write-KoteliReceipt -Label 'Legacy kxaid.exe' -Value 'removed'
+			}
 			Write-KoteliReceipt -Label 'Destination' -Value $installDirectory
 			Write-KoteliReceipt -Label 'PATH' -Value $pathResult
 			Write-KoteliReceipt -Label 'Koteli state' -Value (
 				"preserved ($configDirectory)"
 			)
-			Write-KoteliNext -Label 'Terminal 1' -Value 'kxaid - start the daemon'
+			Write-KoteliNext -Label 'Terminal 1' -Value (
+				'kotelid - start the daemon (or kotelid --daemonize)'
+			)
 			Write-KoteliNext -Label 'Terminal 2' -Value 'koteli - open Koteli'
 		} finally {
 			if (Test-Path -LiteralPath $tempDirectory) {
