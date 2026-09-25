@@ -552,6 +552,7 @@ class PosixInstallerTests(unittest.TestCase):
         *,
         columns: int = 80,
     ) -> tuple[int, bytes, list[int], list[int]]:
+        import errno
         import fcntl
         import pty
         import termios
@@ -559,6 +560,7 @@ class PosixInstallerTests(unittest.TestCase):
         master, slave = pty.openpty()
         self.addCleanup(os.close, master)
         self.addCleanup(os.close, slave)
+        slave_name = os.ttyname(slave)
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 30, columns, 0, 0))
         before = termios.tcgetattr(slave)
 
@@ -610,7 +612,17 @@ class PosixInstallerTests(unittest.TestCase):
             process.kill()
             process.wait(timeout=5)
             self.fail(f"PTY installer timed out:\n{transcript.decode(errors='replace')}")
-        after = termios.tcgetattr(slave)
+        try:
+            after = termios.tcgetattr(slave)
+        except termios.error as exc:
+            if exc.args and exc.args[0] == errno.ENOTTY:
+                reopened_slave = os.open(slave_name, os.O_RDWR | os.O_NOCTTY)
+                try:
+                    after = termios.tcgetattr(reopened_slave)
+                finally:
+                    os.close(reopened_slave)
+            else:
+                raise
         return process.returncode, bytes(transcript), before, after
 
     @unittest.skipUnless(
