@@ -350,10 +350,16 @@ button_menu() {
 		numbered_menu
 		return
 	fi
-	menu_width=$(tput cols 2>/dev/null) || {
-		numbered_menu
-		return
-	}
+	# tput cols falls back to the terminfo default when stdout is a pipe
+	# (macOS), so ask the terminal itself first.
+	menu_width=$(stty size < /dev/tty 2>/dev/null) || menu_width=''
+	menu_width=${menu_width#* }
+	if [ -z "$menu_width" ] || [ "$menu_width" = 0 ]; then
+		menu_width=$(tput cols 2>/dev/null) || {
+			numbered_menu
+			return
+		}
+	fi
 	case "$menu_width" in
 		'' | *[!0-9]*)
 			numbered_menu
