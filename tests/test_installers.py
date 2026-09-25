@@ -789,7 +789,10 @@ class WindowsInstallerTests(unittest.TestCase):
             cls.conpty_helper = None
 
     def setUp(self) -> None:
-        self.workspace = pathlib.Path(tempfile.mkdtemp(prefix="koteli-win-test-"))
+        # resolve() expands 8.3 short names (e.g. RUNNER~1) the installer normalizes.
+        self.workspace = pathlib.Path(
+            tempfile.mkdtemp(prefix="koteli-win-test-")
+        ).resolve()
         self.addCleanup(shutil.rmtree, self.workspace, True)
         self.install_dir = self.workspace / "bin"
         self.local_app_data = self.workspace / "local"
