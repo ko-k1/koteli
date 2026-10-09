@@ -198,9 +198,6 @@ class PosixInstallerTests(unittest.TestCase):
                 "KOTELI_DOWNLOAD_BASE": base_url,
             }
         )
-        # WHY: the legacy state path follows XDG_STATE_HOME; an inherited
-        # value would point uninstall tests at the developer's real state.
-        env.pop("XDG_STATE_HOME", None)
         return env
 
     def run_installer(
@@ -390,8 +387,7 @@ class PosixInstallerTests(unittest.TestCase):
         state = self.home / ".koteli"
         state.mkdir(parents=True)
         project = self.workspace / "project"
-        (project / ".kxai").mkdir(parents=True)
-        (project / ".koteli").mkdir()
+        (project / ".koteli").mkdir(parents=True)
         env = self.environment("http://127.0.0.1:9")
         env.update(
             {
@@ -404,75 +400,7 @@ class PosixInstallerTests(unittest.TestCase):
         output = assert_plain(self, result.stdout + result.stderr)
         self.assertIn("[result] Koteli state: removed", output)
         self.assertFalse(state.exists())
-        self.assertTrue((project / ".kxai").is_dir())
         self.assertTrue((project / ".koteli").is_dir())
-
-    def test_update_replaces_the_legacy_kxaid_daemon(self) -> None:
-        self.install_dir.mkdir()
-        for binary in ("koteli", "kxaid"):
-            (self.install_dir / binary).write_bytes(b"old")
-        fixtures = fixture_map(
-            self.system, self.architecture, first=self.fixture, second=self.fixture
-        )
-        with FixtureServer(fixtures) as server:
-            env = self.environment(server.base_url)
-            env["KOTELI_ACTION"] = "update"
-            result = self.run_installer(env)
-        self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
-        output = assert_plain(self, result.stdout + result.stderr)
-        self.assertIn("[result] Legacy kxaid: removed", output)
-        self.assertTrue((self.install_dir / "kotelid").is_file())
-        self.assertFalse((self.install_dir / "kxaid").exists())
-
-    def test_a_legacy_only_installation_is_managed_not_installed_fresh(self) -> None:
-        self.install_dir.mkdir()
-        (self.install_dir / "kxaid").write_bytes(b"old")
-        with FixtureServer({}) as server:
-            env = self.environment(server.base_url)
-            env["KOTELI_ACTION"] = "cancel"
-            result = self.run_installer(env)
-            self.assertEqual(server.hits, [])
-        self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
-        output = assert_plain(self, result.stdout + result.stderr)
-        self.assertIn("kxaid present; replaced by kotelid", output)
-        self.assertIn("[result] Changes: none", output)
-        self.assertTrue((self.install_dir / "kxaid").exists())
-
-    def test_uninstall_yes_removes_current_and_legacy_state_and_daemon(self) -> None:
-        self.install_dir.mkdir()
-        for binary in ("koteli", "kotelid", "kxaid"):
-            (self.install_dir / binary).write_bytes(self.fixture)
-        state = self.home / ".koteli"
-        legacy_state = self.home / ".local" / "state" / "kxai" / "tui" / ".kxai"
-        for directory in (state, legacy_state):
-            directory.mkdir(parents=True)
-            (directory / "state.db").write_text("old", encoding="utf-8")
-        project = self.workspace / "project"
-        (project / ".koteli").mkdir(parents=True)
-        env = self.environment("http://127.0.0.1:9")
-        env.update({"KOTELI_ACTION": "uninstall", "KOTELI_REMOVE_CONFIG": "yes"})
-        result = self.run_installer(env)
-        self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
-        output = assert_plain(self, result.stdout + result.stderr)
-        self.assertIn("[result] Legacy kxaid: removed", output)
-        self.assertIn(f"[result] Legacy kxai state: removed ({legacy_state})", output)
-        self.assertFalse(state.exists())
-        self.assertFalse(legacy_state.exists())
-        self.assertFalse((self.install_dir / "kxaid").exists())
-        self.assertTrue((project / ".koteli").is_dir())
-
-    def test_uninstall_default_preserves_legacy_state(self) -> None:
-        self.install_dir.mkdir()
-        (self.install_dir / "kotelid").write_bytes(self.fixture)
-        legacy_state = self.home / ".local" / "state" / "kxai" / "tui" / ".kxai"
-        legacy_state.mkdir(parents=True)
-        env = self.environment("http://127.0.0.1:9")
-        env["KOTELI_ACTION"] = "uninstall"
-        result = self.run_installer(env)
-        self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
-        output = assert_plain(self, result.stdout + result.stderr)
-        self.assertIn("[result] Legacy kxai state: preserved", output)
-        self.assertTrue(legacy_state.is_dir())
 
     def test_install_action_alias_repairs_an_existing_installation(self) -> None:
         self.install_dir.mkdir()
@@ -982,75 +910,6 @@ class WindowsInstallerTests(unittest.TestCase):
         self.assertIn("[result] Koteli state: preserved", output)
         self.assertTrue((state / "state.db").exists())
 
-    def test_update_replaces_the_legacy_kxaid_daemon(self) -> None:
-        fixtures = fixture_map("win", self.architecture, first=MZ, second=MZ)
-        for shell in self.shells:
-            with self.subTest(shell=pathlib.Path(shell).name):
-                shutil.rmtree(self.install_dir, ignore_errors=True)
-                self.install_dir.mkdir()
-                for name in ("koteli.exe", "kxaid.exe"):
-                    (self.install_dir / name).write_bytes(b"old")
-                with FixtureServer(fixtures) as server:
-                    env = self.environment(server.base_url)
-                    env["KOTELI_ACTION"] = "update"
-                    result = self.run_installer(shell, env)
-                self.assertEqual(
-                    result.returncode, 0, result.stderr.decode(errors="replace")
-                )
-                output = assert_plain(self, result.stdout + result.stderr)
-                self.assertIn("[result] Legacy kxaid.exe: removed", output)
-                self.assertTrue((self.install_dir / "kotelid.exe").is_file())
-                self.assertFalse((self.install_dir / "kxaid.exe").exists())
-
-    def test_a_legacy_only_installation_is_managed_not_installed_fresh(self) -> None:
-        self.install_dir.mkdir()
-        (self.install_dir / "kxaid.exe").write_bytes(b"old")
-        with FixtureServer({}) as server:
-            env = self.environment(server.base_url)
-            env["KOTELI_ACTION"] = "cancel"
-            result = self.run_installer(self.shells[0], env)
-            self.assertEqual(server.hits, [])
-        self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
-        output = assert_plain(self, result.stdout + result.stderr)
-        self.assertIn("kxaid.exe present; replaced by kotelid.exe", output)
-        self.assertIn("[result] Changes: none", output)
-
-    def test_uninstall_yes_removes_current_and_legacy_state_and_daemon(self) -> None:
-        self.install_dir.mkdir()
-        for name in ("koteli.exe", "kotelid.exe", "kxaid.exe"):
-            (self.install_dir / name).write_bytes(b"old")
-        state = self.home / ".koteli"
-        legacy_state = self.local_app_data / "kxai" / "tui" / ".kxai"
-        for directory in (state, legacy_state):
-            directory.mkdir(parents=True)
-            (directory / "state.db").write_text("old", encoding="utf-8")
-        project = self.workspace / "project"
-        (project / ".koteli").mkdir(parents=True)
-        env = self.environment("http://127.0.0.1:9")
-        env.update({"KOTELI_ACTION": "uninstall", "KOTELI_REMOVE_CONFIG": "yes"})
-        result = self.run_installer(self.shells[0], env)
-        self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
-        output = assert_plain(self, result.stdout + result.stderr)
-        self.assertIn("[result] Legacy kxaid.exe: removed", output)
-        self.assertIn("[result] Legacy kxai state: removed", output)
-        self.assertFalse(state.exists())
-        self.assertFalse(legacy_state.exists())
-        self.assertFalse((self.install_dir / "kxaid.exe").exists())
-        self.assertTrue((project / ".koteli").is_dir())
-
-    def test_uninstall_default_preserves_legacy_state(self) -> None:
-        self.install_dir.mkdir()
-        (self.install_dir / "kotelid.exe").write_bytes(b"old")
-        legacy_state = self.local_app_data / "kxai" / "tui" / ".kxai"
-        legacy_state.mkdir(parents=True)
-        env = self.environment("http://127.0.0.1:9")
-        env["KOTELI_ACTION"] = "uninstall"
-        result = self.run_installer(self.shells[0], env)
-        self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
-        output = assert_plain(self, result.stdout + result.stderr)
-        self.assertIn("[result] Legacy kxai state: preserved", output)
-        self.assertTrue(legacy_state.is_dir())
-
     def test_install_action_alias_repairs_existing_binaries(self) -> None:
         self.install_dir.mkdir()
         for name in ("koteli.exe", "kotelid.exe"):
@@ -1145,8 +1004,7 @@ $env:KOTELI_REMOVE_CONFIG = 'no'
         state = self.home / ".koteli"
         state.mkdir(parents=True)
         project = self.workspace / "project"
-        (project / ".kxai").mkdir(parents=True)
-        (project / ".koteli").mkdir()
+        (project / ".koteli").mkdir(parents=True)
         env = self.environment("http://127.0.0.1:9")
         env.update(
             {
@@ -1159,7 +1017,6 @@ $env:KOTELI_REMOVE_CONFIG = 'no'
         output = assert_plain(self, result.stdout + result.stderr)
         self.assertIn("[result] Koteli state: removed", output)
         self.assertFalse(state.exists())
-        self.assertTrue((project / ".kxai").is_dir())
         self.assertTrue((project / ".koteli").is_dir())
 
     def test_conpty_cancel_keeps_existing_transcript_visible(self) -> None:

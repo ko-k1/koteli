@@ -45,10 +45,6 @@ Koteli keeps its user configuration and state in `~/.koteli`
 (`%USERPROFILE%\.koteli` on Windows), including the running daemon's endpoint
 record, its per-start client token, and its log.
 
-Upgrading from a build whose daemon was called `kxaid`: Update and Repair
-install `kotelid` and remove the old `kxaid` binary. An installation that still
-holds only `kxaid` is recognized and repaired.
-
 Running a native installer again opens a compact installed-app manager:
 
 ```text
@@ -68,11 +64,9 @@ Redirected output and runs with a nonempty `CI`, `TERM=dumb`, or `NO_COLOR`
 or terminal control sequences. Otherwise, color is enabled on a real terminal,
 with Unicode decoration only when its output encoding is UTF-8.
 
-Uninstall displays Koteli's exact user-state path, `~/.koteli`, and, when it
-still exists, the legacy `kxai` state directory used by earlier builds, then
-asks `Remove Koteli user configuration and state? [y/N]`. The default is No;
-Yes removes both. Uninstall also removes a leftover `kxaid` binary.
-Project-local `.kxai` and `.koteli` directories are never removed.
+Uninstall displays Koteli's exact user-state path, `~/.koteli`, then
+asks `Remove Koteli user configuration and state? [y/N]`. The default is No.
+Project-local `.koteli` directories are never removed.
 
 ### Native installer automation
 

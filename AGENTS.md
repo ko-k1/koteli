@@ -6,7 +6,7 @@
 
 ## Layout
 
-- `install.sh` — POSIX `sh` installer (macOS/Linux, 888 lines).
+- `install.sh` — POSIX `sh` installer (macOS/Linux).
 - `install.ps1` — Windows installer, PowerShell 5.1 + 7 compatible.
 - `tests/test_installers.py` — zero-dependency stdlib integration tests.
 - `tests/conpty_helper.cs` — ConPTY driver, inbox `csc.exe` only.
@@ -74,14 +74,13 @@ if ($errors.Count) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1
 
 ## Safety / do-not
 
-- Config deletion is allowlisted to exact `~/.koteli` (+ legacy `.../kxai/tui/.kxai`).
-  Never delete project-local `.kxai`/`.koteli`. Never widen the `rm -rf` boundary.
+- Config deletion is allowlisted to exact `~/.koteli`.
+  Never delete project-local `.koteli`. Never widen the `rm -rf` boundary.
 - Validation order matters: validate downloads in temp dir before touching the
   install dir; `koteli-install.*` temp dirs must always be cleaned (incl. signals).
 - Do not commit `.tokensave/`, `.serena/`, or `__pycache__/`. Respect LF for `*.sh`.
 
 ## Where to look
 
-- Receipt keys: `Action / Binaries / Destination / PATH / Koteli state / Legacy kxaid`.
-- Legacy `kxaid[.exe]` (now `kotelid`): update/repair/uninstall must remove it.
+- Receipt keys: `Action / Binaries / Destination / PATH / Koteli state / Local projects`.
 - Details: `README.md` (env vars, manager menu), stage logic in installers, cases in `test_installers.py`.
