@@ -1,0 +1,51 @@
+name: Improvement / idea
+description: Suggest an improvement or a new idea for Koteli.
+title: "[Improvement] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Small, concrete suggestions are the easiest to act on.
+        A screenshot or a rough sketch of what you mean is very welcome.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installer
+        - CLI
+        - TUI
+        - kotelid (daemon)
+        - Documentation
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: pain
+    attributes:
+      label: What is inconvenient or missing today?
+      description: The situation, what you tried, and where it fell short.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Your suggestion
+      description: What should change, and how would you like it to behave?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots / mock (optional)
+      description: Drag and drop an image here, or describe the screen or flow you have in mind.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: How often this comes up, workarounds you use now, or examples from other tools.
+    validations:
+      required: false

@@ -1,0 +1,99 @@
+name: Bug report
+description: Report a problem with Koteli. Screenshots or terminal output help a lot.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Koteli is a test build, so rough edges are expected.
+        Please do not paste API keys, tokens, or other secrets into this issue.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem as concretely as you can.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What did you run or do before it happened? Include the exact commands if you can.
+      placeholder: |
+        1. Ran `koteli ...`
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: false
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots / terminal output
+      description: Drag and drop a screenshot or image here, or paste the terminal output as text. For TUI or installer problems, a screenshot of the whole terminal window is ideal.
+      placeholder: |
+        (drop an image here, or paste output)
+
+        ```
+        terminal output
+        ```
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installer
+        - CLI
+        - TUI
+        - kotelid (daemon)
+        - Documentation
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: How did you install Koteli?
+      options:
+        - install.sh (macOS / Linux)
+        - install.ps1 (Windows)
+        - Bun
+        - npm (deprecated)
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS / platform
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (x86_64)
+        - Linux (arm64)
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Koteli version
+      description: If you do not know the version, write roughly when you installed it.
+      placeholder: e.g. installed 2026-10-27 via install.sh
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Relevant config (never secrets), related issues, or what you were trying to achieve.
+    validations:
+      required: false
